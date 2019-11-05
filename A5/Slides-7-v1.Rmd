@@ -1,0 +1,67 @@
+---
+title: "SDS 3386 <br>  Lecture 7 v1"
+author: "Peter Rabinovitch"
+date: "`r Sys.Date()`"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warnings = FALSE, message = FALSE, echo = FALSE, }
+library(knitr)
+```
+
+
+# Any questions?
+
+# Suggestion
+
+For more 'fancy' stats stuff, see
+http://faculty.marshall.usc.edu/gareth-james/ISL/
+
+![](ISLR.jpg){width=500px}
+
+
+# Assignment 5
+
+The recent federal election had a 64 % turnout (fraction of people who were eligible to vote who actually did). I would have expected more people to vote, because this was expected to be, and indeed turned out to be a close race.
+
+Using the 2018 municipal election data investigate the claim that closer races lead to higher turnouts.
+
+Use whatever tools/plots/stats/explanations you need, but as always
+- it must be reproducible and written as a report to your boss.
+
+**Due Nov 4, 16:00**
+
+
+# Functions you might need someday
+
+load & run Functions.r
+
+# Regression & broom
+
+load & run regression.r
+
+# Clustering & Mapping
+
+load & run Clustering.r
+
+# pdf
+
+load & run lobstah.r
+
+
+# Web
+
+load & run Web.r
+
+
+# text & graphs
+
+load & run Springfield.r
+
+
+
+
