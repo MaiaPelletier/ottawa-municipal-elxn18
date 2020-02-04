@@ -1,0 +1,274 @@
+---
+title: "Assignment 6"
+subtitle: "SDS3386"
+author: "Maia Pelletier (8245669)"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+---
+
+```{r markdown setup, include = FALSE}
+knitr::opts_chunk$set(
+  fig.align='center', 
+  fig.width = 9, 
+  fig.height = 6, 
+  warning = FALSE, 
+  message = FALSE
+  )
+```
+
+**Note**: Libraries used in this code are *tidyverse*, *readxl*, *janitor*, *ggthemes*, *viridis*, *kableExtra*, and *broom*. Please install these libraries before knitting.   
+
+```{r setup}
+
+# Load libraries
+library(tidyverse)
+library(janitor)
+library(readxl)
+library(ggthemes)
+library(viridis)
+library(kableExtra)
+library(broom)
+
+# Set theme for graphics
+theme_set(theme_minimal())
+```
+
+
+# Description  
+
+We are interested in investigating whether close election races lead to higher voter turn-out, using data collected from the 2018 Ottawa municipal election.  
+
+# Does voter turnout increase for close election races?  
+
+The first thing we are interested in investigating is how close the races in each ward actually were. It is important to note that I make the assumption that it is safe to remove the advance polls from this analysis. This is dicussed in the **Comments** section of this report.   
+
+```{r, warning=FALSE, message=FALSE}
+get_winners <- function(ward, num_of_winners = 1){
+  
+# Function to retrieve the sepcified number of winners in a ward, given a
+# dataframe containing voting totals.
+  
+  # Clean voting data
+  clean_ward <- 
+    ward %>%
+    clean_names() %>%
+    select(-starts_with('x')) %>%
+    na.omit() %>%
+    select(-precinct_7) %>%
+    rename(precinct = precinct_1) %>%
+    filter(!str_detect(precinct, 'Total'))
+  
+  # Make dataframe longer (gather candidates into one column) 
+  ward_long <- 
+    clean_ward %>%
+    pivot_longer(5:(ncol(clean_ward)-1), names_to = 'candidate', values_to = 'votes') %>%
+    mutate(candidate = str_to_title(str_replace_all(candidate, '_', ' '))) %>% 
+    separate(precinct, c('precinct_id', 'precinct_name'), sep = ' - ', extra = 'merge') %>%
+    filter(!str_detect(precinct_id, 'Adv')) 
+  
+  # Select row containing ward winner(s) 
+  ward_winner <- 
+    ward_long %>%
+    group_by(candidate) %>%
+    summarise(total_candidate_votes = sum(votes)) %>%
+    mutate(total_ward_votes = sum(total_candidate_votes),
+           frac_candidate_votes = total_candidate_votes/total_ward_votes) %>%
+    top_n(num_of_winners, total_candidate_votes)
+  
+  return(ward_winner)
+}
+
+file <- 'statementofvotescastoctober242018.xls' # Data to read
+
+num_of_wards <- 23 # Number of wards in Ottawa
+
+ward_winners_df <- tibble() # Empty df to append to
+
+# Iterate over number of wards to build df of ward winners
+for (i in 1:num_of_wards) {
+  add_ward <- get_winners(read_excel(file, sheet = i + 2, skip = 2), num_of_winners = 2)
+  ward_winners_df <- bind_rows(ward_winners_df, mutate(add_ward, ward = i))
+}
+
+# Widen ward winner df
+ward_winners_wide <- 
+  ward_winners_df %>%
+    group_by(ward) %>%
+    mutate(maxvotes = max(total_candidate_votes)) %>%
+    mutate(rank = ifelse(total_candidate_votes == maxvotes, 'winner', 'runner-up')) %>%
+    select(-maxvotes, -candidate, -frac_candidate_votes, -total_ward_votes) %>%
+    pivot_wider(names_from = rank, values_from = total_candidate_votes)
+
+# Plot ward winner and runner-up
+ggplot(ward_winners_wide) +
+  geom_segment(aes(x = factor(ward), xend = ward, y = `runner-up`, yend = winner), size = 1, color = 'grey55') +
+  geom_point(aes(x = ward, y = `runner-up`, color = 'runner-up'), size = 5, alpha = 0.7) +
+  geom_point(aes(x = ward, y = winner, color = 'winner'), size = 5, alpha = 0.7) +
+  coord_flip() +
+  labs(x = NULL, y = 'Votes', title = 'Vote totals for winner & runner-up in each ward', 
+       subtitle = '2018 Ottawa municipal election') +
+  scale_x_discrete(labels = paste('Ward', 1:23)) +
+  scale_color_canva(palette = 'Summer sunflower', name = NULL) +
+  theme_hc() +
+  theme(axis.text.x = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        plot.title = element_text(color = 'grey20', face = 'italic', size = 18),
+        plot.subtitle = element_text(color = 'grey30', size = 10))
+```
+
+We can see here the margin between the winner and the runner-ups in each ward in Ottawa:
+Wards where there are particularly close races include 1, 17, and 18. We will be interested in looking at the voter turnout in these wards in our analysis to see if they follow our hypothesis that their turnout will be higher.  
+
+The metric of interest here is the difference between the votes for the winner and the votes for the runner up, so we calculate that. I decided to use the difference between the fraction of votes here.    
+
+```{r margin}
+# Find margin between winner and runner-up
+margin_df <-
+  ward_winners_df %>%
+    group_by(ward) %>%
+    mutate(minvotes = min(frac_candidate_votes)) %>%
+    mutate(margin = frac_candidate_votes-minvotes) %>%
+    top_n(1, total_candidate_votes) %>%
+    select(-minvotes)
+
+# Find 10 closest races
+margin_df %>%
+  select(candidate, ward, frac_candidate_votes, margin) %>%
+  arrange(margin) %>%
+  head(10) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), fixed_thead = T)
+```
+
+
+Here we can see the top 10 closest races. As we noted before: Wards 1, 17, and 18 had extremely close races. They all came within 1% of their closest competitor in share of votes.  
+
+The other thing that needs to be calculated is the voter turn-out for each ward, so that we can compare it to the margin each ward winner won by.  
+
+```{r, fig.height=5, fig.width=7}
+# Read ward voting data and tidy
+ward_summary <- 
+  read_excel(file, sheet = 1, skip = 2) %>%
+  clean_names() %>%
+  select(-starts_with('x')) %>%
+  filter(!is.na(registered_voters),
+         !str_detect(precinct, 'City / Ville - Total'))  %>% 
+  separate(precinct, c('precinct_id', 'precinct_name'), ' - ', extra = 'merge') %>%
+  filter(!str_detect(precinct_id, 'Adv'))
+
+# Calculate the fraction of voter turn-out
+frac_elig_voters <- 
+  ward_summary %>%
+  separate(precinct_id, c('ward', 'polling_station_no'), sep = '-') %>%
+  mutate(ward = as.numeric(ward)) %>%
+  group_by(ward) %>%
+  summarise(total_registered_voters = sum(registered_voters),
+            total_cards_cast = sum(cards_cast)) %>%
+  mutate(frac_votes = total_cards_cast/total_registered_voters)
+
+# Plot voter turn-out distribution
+frac_elig_voters %>%
+  ggplot(aes(frac_votes)) +
+  geom_density(fill = '#34888c', color = '#34888c', alpha = 0.7, adjust = 0.5) +
+  labs(x = 'Voter turn-out', y = 'Density') +
+  ggtitle('Distribution of voter turn-out in wards', subtitle = 'Ottawa municipal election 2018') +
+  theme(axis.title = element_text(color = 'grey40', face = 'italic', size = 11),
+        axis.text = element_text(color = 'grey40', size = 8),
+        plot.title = element_text(color = 'grey20', face = 'italic', size = 18),
+        plot.subtitle = element_text(color = 'grey30', size = 10))
+```
+
+We see that the wards' voter turnout on election day in 2018 hovered around 28%-38% (not including advanced polls). Finally, the voter turn-out is combined with the margin of votes the winner won by and we are able to investigate the relationship between voter turn-out and close elections.  
+
+```{r}
+# Join data together
+final_df <-
+  margin_df %>% 
+    right_join(frac_elig_voters, by = 'ward') %>%
+    select(candidate, frac_candidate_votes, ward, margin, frac_votes)
+
+# Final plot to investigate relationship
+final_df %>% 
+  ggplot(aes(frac_votes, margin)) +
+  geom_point(aes(color = margin), size = 5, alpha = 0.8) +
+  geom_smooth(formula = y ~ x, method = 'lm', alpha = 0.1, color = 'lightblue') +
+  geom_text(aes(label = paste('Ward', ward)), nudge_y = 0.040, nudge_x = 0.0025, size = 3, check_overlap = TRUE, color = 'grey55') +
+  labs(x = 'Fraction of registered voters who cast votes', y = 'Margin between candidates') +
+  ggtitle('Do closer races lead to higher voter turnouts?', subtitle = 'Analysis of Ottawa 2018 municipal election') +
+  theme_minimal() +
+  viridis::scale_color_viridis(name = 'Margin') +
+  theme(axis.title = element_text(color = 'grey40', face = 'italic', size = 10),
+        axis.text = element_text(color = 'grey40', size = 8),
+        plot.title = element_text(color = 'grey20', face = 'italic', size = 18),
+        plot.subtitle = element_text(color = 'grey30', size = 10))
+```
+
+Indeed, it seems that our hypothesis is supported by our plot. There is a trend that shows as the margin between the winners and their runner-up decreases, the voter turnout in the ward increases. Note Ward 1 and Ward 17: both have voter turnouts of greater than 35% on election day.    
+
+To further investigate our initial claim, we preform a regression analysis to determine if the relationship between close election races and high voter turnout is significant.  
+
+```{r reg}
+# Linear model
+mod <- lm(margin ~ frac_votes, data = final_df)
+
+# Coefficient summary
+mod %>% 
+  tidy() %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+# Full model summary
+mod %>%
+  glance() %>%
+  select(1:6) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+
+```
+
+We can see that all of the coefficients of the model are significant at standard significance level $\alpha = 0.05$. The p-value for the model is 0.01626412, which is also significant at $\alpha$. Thus, we conclude that there is a significant relationship between the response variable, margin between the winner and runner-up, and the predictor, voter turn-out.    
+
+# Comments  
+
+### Biased results  
+
+```{r}
+final_df %>%
+  filter(ward == 18) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+While investigating outliers, I was looking into the election in Ward 18 (Alta Vista) and discovered that while our data reports that Raylene Lang Dion won when Jean Cloutier actually won the election in 2018. This is because in our analysis, we only considered voters who voted on election day (not counting advance polling). Since the race *was* so close in Ward 18, the advance votes really counted during this particular contest.
+
+After discovering this, I double checked all the ward winners with the actual results of the election [Ref 1] and this seems to be the only inaccurate result reported by excluding the advance polls. Nevertheless, this highlights how making the assumption that it would be reasonable to exclude the advanced polls could bias the results of our analysis. The relationship we found to be significant may be more/less valid if we took advance polls into consideration.  
+
+### Outliers  
+
+- **Ward 15** had a large margin of votes between the winner and the runner-up and also had a large voter turn-out. Upon further investigation, I discovered that the winner in this ward (Jeff Leiper) was up for re-election[Ref 2]. It would make sense if the voters in Ward 15 *really* liked having him as their counciller during his previous term, they would show up in large numbers to ensure his re-election.  
+
+# Suggestions for further explorations  
+
+- It would be interesting to collect demographic data for each ward (the average age, average income, etc.) to add to our model and see if this data adds information to the likeliness of a close race within a ward. I.e. Are the wards very similar or dissimilar where there are closer elections?  
+
+- It would be interesting to compare/contract the policies and promises of candidates who ran close races.  
+
+# References  
+
+[1] https://globalnews.ca/news/4582442/city-of-ottawa-council-2018-election/  
+
+http://r-spatial.github.io/sf/
+
+https://open.ottawa.ca/datasets/wards
+
+
+# Appendix: sessionInfo
+
+```{r}
+sessionInfo()
+```
+

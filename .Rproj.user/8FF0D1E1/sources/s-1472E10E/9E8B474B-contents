@@ -192,7 +192,7 @@ ggplot(ward_winners_wide) +
   )
 ```
 
-<img src="README_files/figure-gfm/get winners and plot-1.png" style="display: block; margin: auto;" />
+<img src="OttawaElectionAnalysis_files/figure-gfm/get winners and plot-1.png" style="display: block; margin: auto;" />
 
 We can see here the margin between the winner and the runner-ups in each
 ward in Ottawa. Wards where there are particularly close races include
@@ -632,7 +632,7 @@ ggplot() +
         legend.key.width = unit(13.6, 'mm'))
 ```
 
-<img src="README_files/figure-gfm/voter turn out-1.png" style="display: block; margin: auto;" />
+<img src="OttawaElectionAnalysis_files/figure-gfm/voter turn out-1.png" style="display: block; margin: auto;" />
 
 We see that Ward 17 (Capital) had the highest voter turn-out in the city
 and Ward 10 (Gloucester-Southgate) had the lowest. These will be
@@ -698,7 +698,7 @@ final_df %>%
   ) 
 ```
 
-<img src="README_files/figure-gfm/final plot-1.png" style="display: block; margin: auto;" />
+<img src="OttawaElectionAnalysis_files/figure-gfm/final plot-1.png" style="display: block; margin: auto;" />
 
 Indeed, it seems that our hypothesis is supported by our plot. There is
 a trend that shows as the margin between the winners and their runner-up
@@ -1286,7 +1286,7 @@ combine_polling %>%
   )
 ```
 
-<img src="README_files/figure-gfm/unnamed-chunk-2-1.png" style="display: block; margin: auto;" />
+<img src="OttawaElectionAnalysis_files/figure-gfm/unnamed-chunk-2-1.png" style="display: block; margin: auto;" />
 
 This makes total sense\! The Capital ward (Ward 17) had the second
 closest race and the highest voter turn-out. It’s no surprise that the

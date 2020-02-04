@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1580832450947.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1762229610",
+    "id" : "6A344CB7",
+    "lastKnownWriteTime" : 1580832263,
+    "last_content_update" : 1580832263,
+    "path" : "~/GitHub/ottawa-municipal-elxn18/README.Rmd",
+    "project_path" : "README.Rmd",
+    "properties" : {
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}
